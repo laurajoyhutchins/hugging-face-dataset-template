@@ -1,0 +1,9 @@
+[dataset]
+source_glob = "source/*.jsonl"
+schema = "schema/dataset.schema.json"
+output = "data/train.parquet"
+manifest = "data/manifest.json"
+
+[huggingface]
+repo_id = "CHANGE_ME"
+private = false

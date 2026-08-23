@@ -3,24 +3,14 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pyarrow.parquet as pq
 import pytest
-
-try:
-    import pyarrow.parquet as pq
-    from datasets import load_dataset
-except ModuleNotFoundError:
-    pq = None
-    load_dataset = None
+from datasets import load_dataset
 
 from dataset_pipeline.build import build_dataset
 from dataset_pipeline.errors import DatasetValidationError
 from dataset_pipeline.publish import stage_hub_projection
 from dataset_pipeline.validate import validate_dataset
-
-pytestmark = pytest.mark.skipif(
-    pq is None or load_dataset is None,
-    reason="Parquet and Hugging Face integration dependencies are not installed",
-)
 
 
 def test_build_materializes_parquet_and_manifest(dataset_project: Path) -> None:

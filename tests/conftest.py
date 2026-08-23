@@ -29,10 +29,11 @@ def dataset_project(tmp_path: Path) -> Path:
         '{"id":"a","text":"alpha"}\n{"id":"b","text":"beta"}\n',
         encoding="utf-8",
     )
-    (tmp_path / "README.md").write_text(
-        "---\nconfigs:\n- config_name: default\n  data_files:\n  - split: train\n    path: data/train.parquet\n---\n\n# Fixture\n",
-        encoding="utf-8",
+    card = (
+        "---\nconfigs:\n- config_name: default\n  data_files:\n"
+        "  - split: train\n    path: data/train.parquet\n---\n\n# Fixture\n"
     )
+    (tmp_path / "README.md").write_text(card, encoding="utf-8")
     (tmp_path / "dataset.toml").write_text(
         '[dataset]\n'
         'source_glob = "source/*.jsonl"\n'

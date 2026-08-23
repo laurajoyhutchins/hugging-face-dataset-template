@@ -64,7 +64,8 @@ with the build that produced the artifact.
 
 `uv run dataset publish` validates first, stages only `README.md`, the Parquet dataset, and its
 manifest, creates the configured Hugging Face dataset repository if necessary, and uploads that
-projection. It refuses to publish while `huggingface.repo_id` is still a placeholder.
+projection, deleting stale remote files so the Hub stays an exact generated projection. It refuses
+to publish while `huggingface.repo_id` is still a placeholder.
 
 ## Hugging Face publication
 

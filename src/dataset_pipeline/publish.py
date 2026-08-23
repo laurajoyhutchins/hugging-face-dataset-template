@@ -57,6 +57,7 @@ def publish_dataset(config_path: str | Path = "dataset.toml", token: str | None 
             repo_id=config.huggingface_repo_id,
             repo_type="dataset",
             folder_path=staging,
+            delete_patterns="**",
             commit_message="Publish dataset projection",
         )
     return str(result)

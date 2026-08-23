@@ -27,6 +27,43 @@ def test_build_rejects_schema_violation_before_materialization(dataset_project: 
         build_dataset(dataset_project / "dataset.toml")
 
 
-def test_publish_rejects_placeholder_repo_id(dataset_project: Path) -> None:
+def test_publish_rejects_placeholder_repo_id_before_network_call(dataset_project: Path) -> None:
     with pytest.raises(DatasetConfigurationError, match="huggingface.repo_id"):
         publish_dataset(dataset_project / "dataset.toml")
+
+
+def test_publish_replaces_stale_remote_projection(
+    dataset_project: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config_path = dataset_project / "dataset.toml"
+    config_path.write_text(
+        config_path.read_text(encoding="utf-8").replace("CHANGE_ME", "owner/dataset"),
+        encoding="utf-8",
+    )
+    staging = tmp_path / "staging"
+    staging.mkdir()
+    calls: dict[str, object] = {}
+
+    class FakeApi:
+        def __init__(self, token: str | None = None) -> None:
+            calls["token"] = token
+
+        def create_repo(self, **kwargs: object) -> None:
+            calls["create_repo"] = kwargs
+
+        def upload_folder(self, **kwargs: object) -> str:
+            calls["upload_folder"] = kwargs
+            return "published"
+
+    monkeypatch.setattr("huggingface_hub.HfApi", FakeApi)
+    monkeypatch.setattr(
+        "dataset_pipeline.publish.stage_hub_projection",
+        lambda config_path, destination: staging,
+    )
+
+    result = publish_dataset(config_path, token="test-token")
+
+    assert result == "published"
+    upload = calls["upload_folder"]
+    assert isinstance(upload, dict)
+    assert upload["delete_patterns"] == "**"

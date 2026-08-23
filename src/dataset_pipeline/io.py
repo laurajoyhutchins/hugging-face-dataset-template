@@ -67,7 +67,9 @@ def load_source_records(
             try:
                 record = json.loads(raw_line)
             except json.JSONDecodeError as exc:
-                raise DatasetValidationError(f"{relative}:{line_number}: invalid JSON: {exc}") from exc
+                raise DatasetValidationError(
+                    f"{relative}:{line_number}: invalid JSON: {exc}"
+                ) from exc
             if not isinstance(record, dict):
                 raise DatasetValidationError(
                     f"{relative}:{line_number}: each JSONL record must be an object"

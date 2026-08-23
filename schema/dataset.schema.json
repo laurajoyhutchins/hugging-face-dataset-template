@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Example dataset row",
+  "type": "object",
+  "required": ["id", "text"],
+  "properties": {
+    "id": {"type": "string", "minLength": 1},
+    "text": {"type": "string"}
+  },
+  "additionalProperties": false
+}

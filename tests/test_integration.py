@@ -40,6 +40,35 @@ def test_validate_detects_source_drift(dataset_project: Path) -> None:
         validate_dataset(dataset_project / "dataset.toml")
 
 
+
+@pytest.mark.parametrize("change", ["added", "removed", "renamed"])
+def test_validate_detects_source_inventory_drift(dataset_project: Path, change: str) -> None:
+    build_dataset(dataset_project / "dataset.toml")
+    source = dataset_project / "source" / "records.jsonl"
+    if change == "added":
+        (dataset_project / "source" / "new.jsonl").write_text(
+            '{"id":"c","text":"gamma"}\n', encoding="utf-8"
+        )
+    elif change == "removed":
+        source.unlink()
+    else:
+        source.rename(dataset_project / "source" / "renamed.jsonl")
+
+    with pytest.raises(DatasetValidationError, match="Source inventory changed since build"):
+        validate_dataset(dataset_project / "dataset.toml")
+
+
+def test_validate_rejects_duplicate_manifest_source(dataset_project: Path) -> None:
+    build_dataset(dataset_project / "dataset.toml")
+    path = dataset_project / "data" / "manifest.json"
+    manifest = json.loads(path.read_text(encoding="utf-8"))
+    manifest["sources"].append(dict(manifest["sources"][0]))
+    path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    with pytest.raises(DatasetValidationError, match="Source inventory changed since build"):
+        validate_dataset(dataset_project / "dataset.toml")
+
+
 def test_stage_is_hub_compatible_projection(dataset_project: Path, tmp_path: Path) -> None:
     build_dataset(dataset_project / "dataset.toml")
     staging = tmp_path / "hub"

@@ -5,7 +5,14 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .config import load_config
-from .io import canonical_records_sha256, load_schema, load_source_records, sha256_file
+from .errors import DatasetValidationError
+from .io import (
+    canonical_records_sha256,
+    load_schema,
+    load_source_records,
+    project_parquet_rows,
+    sha256_file,
+)
 
 
 @dataclass(frozen=True)
@@ -23,8 +30,15 @@ def build_dataset(config_path: str | Path = "dataset.toml") -> BuildResult:
     import pyarrow as pa
     import pyarrow.parquet as pq
 
+    # Arrow otherwise infers columns from the first row and can silently drop
+    # optional fields that appear only in later source records.
+    projected = project_parquet_rows(records, schema)
+    try:
+        table = pa.Table.from_pylist(projected)
+    except (pa.ArrowException, TypeError, ValueError) as exc:
+        raise DatasetValidationError(f"Cannot encode schema-valid records as Parquet: {exc}") from exc
+
     config.output_path.parent.mkdir(parents=True, exist_ok=True)
-    table = pa.Table.from_pylist(records)
     pq.write_table(
         table,
         config.output_path,

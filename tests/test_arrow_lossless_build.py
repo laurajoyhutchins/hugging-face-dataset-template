@@ -43,7 +43,13 @@ def test_builder_fails_closed_before_manifest_for_mixed_numeric_arrow_coercion(
     # Both rows are valid JSON Schema numbers. Arrow infers float64 when it
     # sees the float and cannot retain the original integer JSON representation.
     assert rows[0]["reading"] == first
-    with pytest.raises(DatasetValidationError, match="Parquet encoding changes"):
+    # Arrow explicitly rejects some unsafe-width integers, while ordinary
+    # int->float widening can pass Arrow but fail the source-identity guard.
+    if first > 2**53:
+        expected = "Cannot encode schema-valid records as Parquet"
+    else:
+        expected = "Parquet encoding changes"
+    with pytest.raises(DatasetValidationError, match=expected):
         build_dataset(dataset_project / "dataset.toml")
     assert not (dataset_project / "data" / "train.parquet").exists()
     assert not (dataset_project / "data" / "manifest.json").exists()

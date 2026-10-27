@@ -30,6 +30,35 @@ def canonical_records_sha256(records: list[dict[str, Any]]) -> str:
     return digest.hexdigest()
 
 
+def project_parquet_rows(
+    records: list[dict[str, Any]], schema: dict[str, Any]
+) -> list[dict[str, Any]]:
+    """Project complete union columns without redefining source JSON identities.
+
+    Parquet has no representation for a missing field distinct from a null
+    value. Missing *optional* fields are represented by null only when that is
+    unambiguous given the validated source rows; the source JSONL stays pinned
+    separately in the manifest.
+    """
+    properties = schema.get("properties", {})
+    required = set(schema.get("required", []))
+    if not isinstance(properties, dict):
+        raise DatasetValidationError("Dataset schema requires declared object properties")
+
+    columns = sorted({key for record in records for key in record})
+    for column in columns:
+        missing = any(column not in record for record in records)
+        explicit_null = any(column in record and record[column] is None for record in records)
+        if missing and column in required:
+            raise DatasetValidationError(f"Required dataset field is absent: {column}")
+        if missing and explicit_null:
+            raise DatasetValidationError(
+                f"Cannot losslessly project optional field {column!r}: "
+                "missing and explicit null would be indistinguishable"
+            )
+    return [{column: row.get(column) for column in columns} for row in records]
+
+
 def load_schema(config: DatasetConfig) -> dict[str, Any]:
     if not config.schema_path.is_file():
         raise DatasetValidationError(

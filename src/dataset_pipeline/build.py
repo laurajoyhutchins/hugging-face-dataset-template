@@ -35,10 +35,18 @@ def build_dataset(config_path: str | Path = "dataset.toml") -> BuildResult:
     projected = project_parquet_rows(records, schema)
     try:
         table = pa.Table.from_pylist(projected)
-    except (pa.ArrowException, TypeError, ValueError) as exc:
+        materialized = table.to_pylist()
+    except (pa.ArrowException, TypeError, ValueError, OverflowError) as exc:
         raise DatasetValidationError(
             f"Cannot encode schema-valid records as Parquet: {exc}"
         ) from exc
+    # Type inference may widen mixed JSON integers/floats into double and round
+    # large exact integers. Do not write a valid-looking manifest for data whose
+    # physical Arrow representation differs from the source projection.
+    if canonical_records_sha256(materialized) != canonical_records_sha256(projected):
+        raise DatasetValidationError(
+            "Parquet encoding changes schema-valid source values"
+        )
 
     config.output_path.parent.mkdir(parents=True, exist_ok=True)
     pq.write_table(

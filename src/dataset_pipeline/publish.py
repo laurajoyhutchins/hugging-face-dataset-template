@@ -15,13 +15,29 @@ def stage_hub_projection(
     config_path: str | Path = "dataset.toml", destination: str | Path = ".hub-staging"
 ) -> Path:
     config = load_config(config_path)
+
+    # Never recursively delete the authoritative project or any path within
+    # it, even when the caller reaches that location through a symlink alias.
+    # Publication already uses a separate TemporaryDirectory; staging is
+    # intentionally confined to paths disjoint from the source project.
+    project_root = config.root.resolve()
+    destination_path = Path(destination).resolve()
+    if (
+        destination_path == project_root
+        or destination_path in project_root.parents
+        or project_root in destination_path.parents
+    ):
+        raise DatasetValidationError(
+            "Staging destination must be outside the authoritative dataset project"
+        )
+    if Path(destination).is_symlink():
+        raise DatasetValidationError("Staging destination cannot be a symbolic link")
     validate_dataset(config_path)
 
     readme = config.root / "README.md"
     if not readme.is_file():
         raise DatasetValidationError("README.md dataset card is required for publication")
 
-    destination_path = Path(destination).resolve()
     if destination_path.exists():
         shutil.rmtree(destination_path)
     destination_path.mkdir(parents=True)

@@ -5,11 +5,16 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from jsonschema import Draft202012Validator
 
 from .config import load_config
 from .errors import DatasetValidationError
-from .io import canonical_records_sha256, load_schema, sha256_file
+from .io import (
+    canonical_records_sha256,
+    load_schema,
+    load_source_records,
+    project_parquet_rows,
+    sha256_file,
+)
 
 
 @dataclass(frozen=True)
@@ -72,17 +77,20 @@ def validate_dataset(config_path: str | Path = "dataset.toml") -> ValidationRepo
 
     import pyarrow.parquet as pq
 
-    records = pq.read_table(config.output_path).to_pylist()
-    validator = Draft202012Validator(schema)
-    for index, record in enumerate(records, start=1):
-        errors = sorted(validator.iter_errors(record), key=lambda error: list(error.path))
-        if errors:
-            raise DatasetValidationError(f"Generated row {index}: {errors[0].message}")
-
-    records_sha256 = canonical_records_sha256(records)
+    # Source JSONL remains authoritative. Parquet null denotes an *absent*
+    # optional field and is not a new JSON value to validate against source
+    # field types or include in the source-record digest.
+    source_records, _ = load_source_records(config, schema)
+    records_sha256 = canonical_records_sha256(source_records)
     if records_sha256 != manifest.get("records_sha256"):
-        raise DatasetValidationError("Generated dataset records differ from source build records")
+        raise DatasetValidationError("Source record identities differ from the build manifest")
+    expected = project_parquet_rows(source_records, schema)
+    table = pq.read_table(config.output_path)
+    records = table.to_pylist()
     if len(records) != manifest.get("row_count"):
         raise DatasetValidationError("Generated dataset row count differs from the build manifest")
-
+    if table.column_names != sorted({key for row in expected for key in row}):
+        raise DatasetValidationError("Generated Parquet columns differ from source projection")
+    if canonical_records_sha256(records) != canonical_records_sha256(expected):
+        raise DatasetValidationError("Generated Parquet fields differ from source projection")
     return ValidationReport(config.output_path, len(records), records_sha256)

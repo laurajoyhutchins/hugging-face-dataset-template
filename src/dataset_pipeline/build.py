@@ -36,7 +36,9 @@ def build_dataset(config_path: str | Path = "dataset.toml") -> BuildResult:
     try:
         table = pa.Table.from_pylist(projected)
     except (pa.ArrowException, TypeError, ValueError) as exc:
-        raise DatasetValidationError(f"Cannot encode schema-valid records as Parquet: {exc}") from exc
+        raise DatasetValidationError(
+            f"Cannot encode schema-valid records as Parquet: {exc}"
+        ) from exc
 
     config.output_path.parent.mkdir(parents=True, exist_ok=True)
     pq.write_table(

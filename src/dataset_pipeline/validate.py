@@ -42,9 +42,25 @@ def validate_dataset(config_path: str | Path = "dataset.toml") -> ValidationRepo
     manifest_sources = manifest.get("sources")
     if not isinstance(manifest_sources, list):
         raise DatasetValidationError("Manifest sources are invalid")
+    declared_paths = []
     for source in manifest_sources:
         if not isinstance(source, dict) or not isinstance(source.get("path"), str):
             raise DatasetValidationError("Manifest source entry is invalid")
+        declared_paths.append(source["path"])
+
+    # Membership is part of build identity, not just the hashes of listed files.
+    # Compare sorted lists so duplicate manifest entries also fail closed.
+    current_paths = sorted(
+        path.relative_to(config.root).as_posix()
+        for path in config.root.glob(config.source_glob)
+        if path.is_file()
+    )
+    if sorted(declared_paths) != current_paths:
+        raise DatasetValidationError(
+            "Source inventory changed since build: added, removed, or renamed files"
+        )
+
+    for source in manifest_sources:
         source_path = config.root / source["path"]
         if not source_path.is_file() or sha256_file(source_path) != source.get("sha256"):
             raise DatasetValidationError(f"Source changed since build: {source['path']}")

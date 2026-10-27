@@ -69,9 +69,11 @@ def test_validate_rejects_duplicate_manifest_source(dataset_project: Path) -> No
         validate_dataset(dataset_project / "dataset.toml")
 
 
-def test_stage_is_hub_compatible_projection(dataset_project: Path, tmp_path: Path) -> None:
+def test_stage_is_hub_compatible_projection(
+    dataset_project: Path, tmp_path_factory: pytest.TempPathFactory
+) -> None:
     build_dataset(dataset_project / "dataset.toml")
-    staging = tmp_path / "hub"
+    staging = tmp_path_factory.mktemp("external-hub-projection") / "hub"
     stage_hub_projection(dataset_project / "dataset.toml", staging)
 
     files = sorted(
